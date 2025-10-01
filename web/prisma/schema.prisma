@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  qrcodes      QRCode[]
+}
+
+model QRCode {
+  id          String      @id @default(cuid())
+  ownerId     String
+  owner       User        @relation(fields: [ownerId], references: [id])
+  label       String
+  slug        String      @unique
+  destination String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  scans       ScanEvent[]
+  // Metadata fields
+  metaTitle       String?
+  metaDescription String?
+  metaImage       String?
+  // Style fields (per-QR)
+  logoUrl       String?
+  fgColor       String?   @default("#000000")
+  bgColor       String?   @default("#ffffff")
+  styleType     String?   @default("square")
+  logoAspect    String?   @default("1:1")
+  cornerRadius  Int?      @default(8)
+  logoSizePct   Int?      @default(24)
+}
+
+model ScanEvent {
+  id         String   @id @default(cuid())
+  qrId       String
+  qr         QRCode   @relation(fields: [qrId], references: [id])
+  createdAt  DateTime @default(now())
+  ip         String?
+  userAgent  String?
+  referer    String?
+  country    String?
+  city       String?
+}
