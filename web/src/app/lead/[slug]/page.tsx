@@ -20,23 +20,24 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function LeadCollectionPage({ params }: PageProps) {
   const { slug } = await params;
   
-  const qr = await prisma.qRCode.findUnique({
+  const qr = (await prisma.qRCode.findUnique({
     where: { slug },
-    include: {
-      leadTemplate: true,
-    },
-  });
+  })) as any;
 
   if (!qr || !qr.collectLeads) {
     notFound();
   }
+
+  const template = qr.leadTemplateId
+    ? await (prisma as any).leadTemplate.findUnique({ where: { id: qr.leadTemplateId } })
+    : null;
 
   return (
     <LeadForm
       qrId={qr.id}
       destination={qr.destination}
       qrLabel={qr.label}
-      template={qr.leadTemplate}
+      template={template || undefined}
     />
   );
 }
