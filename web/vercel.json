@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx prisma generate && npx prisma migrate deploy && next build",
+  "buildCommand": "npx prisma generate && npx prisma db push && next build",
   "functions": {
     "src/app/api/qrcodes/route.ts": {
       "maxDuration": 30
