@@ -29,6 +29,13 @@ export async function GET(
     },
   });
 
+  // If lead collection is enabled, redirect to lead form
+  if (qr.collectLeads) {
+    const url = new URL(req.url);
+    const leadUrl = `${url.origin}/lead/${slug}`;
+    return NextResponse.redirect(leadUrl, 302);
+  }
+
   return NextResponse.redirect(qr.destination, 302);
 }
 

@@ -16,9 +16,29 @@ export async function POST(req: Request) {
 
     const { url } = parsed.data;
 
-    // For YouTube URLs, use fallback immediately due to CORS and rate limiting issues
+    // For YouTube URLs, try to fetch real metadata first, then fallback
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      console.log('YouTube URL detected, using fallback metadata');
+      console.log('YouTube URL detected, attempting to fetch real metadata');
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; AXIO-QR-Bot/1.0)',
+          },
+          signal: AbortSignal.timeout(3000), // Short timeout for YouTube
+        });
+
+        if (response.ok) {
+          const html = await response.text();
+          const metadata = extractYouTubeMetadata(html, url);
+          if (metadata.title && metadata.title !== 'YouTube') {
+            return NextResponse.json(metadata);
+          }
+        }
+      } catch (error) {
+        console.log('YouTube fetch failed, using fallback');
+      }
+      
+      // Fallback to enhanced YouTube metadata
       const fallback = getYouTubeFallback(url);
       return NextResponse.json(fallback);
     }
@@ -140,6 +160,49 @@ function extractMetaContent(html: string, patterns: RegExp[]): string | null {
     }
   }
   return null;
+}
+
+function extractYouTubeMetadata(html: string, url: string) {
+  // Extract video ID
+  const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  const videoId = videoIdMatch ? videoIdMatch[1] : null;
+  
+  // Try multiple patterns for YouTube title
+  const title = extractMetaContent(html, [
+    /<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i,
+    /<meta\s+name="twitter:title"\s+content="([^"]*)"[^>]*>/i,
+    /<title[^>]*>([^<]*?)(?:\s*-\s*YouTube)?<\/title>/i,
+    /"title":"([^"]*?)"/i, // JSON-LD or YouTube API response
+  ]) || 'YouTube Video';
+  
+  // Try multiple patterns for description
+  const description = extractMetaContent(html, [
+    /<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i,
+    /<meta\s+name="twitter:description"\s+content="([^"]*)"[^>]*>/i,
+    /<meta\s+name="description"\s+content="([^"]*)"[^>]*>/i,
+    /"shortDescription":"([^"]*?)"/i, // YouTube API response
+  ]) || 'Watch this video on YouTube.';
+  
+  // Extract image with fallback to thumbnail
+  let image = extractMetaContent(html, [
+    /<meta\s+property="og:image"\s+content="([^"]*)"[^>]*>/i,
+    /<meta\s+name="twitter:image"\s+content="([^"]*)"[^>]*>/i,
+  ]);
+  
+  if (!image && videoId) {
+    image = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  }
+  
+  // Clean up title and description
+  const cleanTitle = title.replace(/\s*-\s*YouTube\s*$/i, '').trim();
+  const cleanDescription = description.replace(/\s+/g, ' ').trim();
+  
+  return {
+    title: cleanTitle || 'YouTube Video',
+    description: cleanDescription || 'Watch this video on YouTube.',
+    favicon: "https://www.youtube.com/favicon.ico",
+    image: image || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+  };
 }
 
 function getYouTubeFallback(url: string) {

@@ -23,6 +23,7 @@ interface AnalyticsData {
     metaImage?: string | null;
   };
   totalScans: number;
+  uniqueScans: number;
   scansByCountry: { country: string | null; _count: { _all: number } }[];
   scansByCity: { city: string | null; _count: { _all: number } }[];
   scansByReferer: { referer: string | null; _count: { _all: number } }[];
@@ -47,7 +48,13 @@ interface Props {
 export default function IndividualQrAnalytics({ data }: Props) {
   const [exporting, setExporting] = useState(false);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
-  const { qr, totalScans, scansByCountry, scansByCity, scansByReferer, scansByDevice, dailyScans, hourlyScans, recentScans } = data;
+  const [userTimezone, setUserTimezone] = useState<string>('');
+  const { qr, totalScans, uniqueScans, scansByCountry, scansByCity, scansByReferer, scansByDevice, dailyScans, hourlyScans, recentScans } = data;
+
+  // Get user's timezone
+  useEffect(() => {
+    setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   // Generate QR code image
   useEffect(() => {
@@ -142,7 +149,37 @@ export default function IndividualQrAnalytics({ data }: Props) {
   
   const topCountry = sortedCountries[0];
   const topCity = sortedCities[0];
-  const peakHour = hourlyScans.reduce((max, current) => current.scans > max.scans ? current : max, hourlyScans[0]);
+  
+  // Convert hourly scans to user's local timezone
+  const getLocalHourlyScans = () => {
+    if (!userTimezone) return hourlyScans;
+    
+    // Create a map for quick lookup
+    const serverHourMap = new Map();
+    hourlyScans.forEach(scan => {
+      serverHourMap.set(scan.hour, scan.scans);
+    });
+
+    // Get timezone offset difference
+    const serverDate = new Date();
+    const userDate = new Date(serverDate.toLocaleString('en-US', { timeZone: userTimezone }));
+    const serverUTCDate = new Date(serverDate.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const timezoneOffset = Math.round((userDate.getTime() - serverUTCDate.getTime()) / (1000 * 60 * 60));
+
+    // Convert each hour to local time
+    const localHourlyScans = [];
+    for (let localHour = 0; localHour < 24; localHour++) {
+      // Calculate corresponding server hour
+      let serverHour = (localHour - timezoneOffset + 24) % 24;
+      const scans = serverHourMap.get(serverHour) || 0;
+      localHourlyScans.push({ hour: localHour, scans });
+    }
+    
+    return localHourlyScans;
+  };
+
+  const localHourlyScans = getLocalHourlyScans();
+  const peakHour = localHourlyScans.reduce((max, current) => current.scans > max.scans ? current : max, localHourlyScans[0]);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -255,7 +292,7 @@ export default function IndividualQrAnalytics({ data }: Props) {
       </Card>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -265,6 +302,20 @@ export default function IndividualQrAnalytics({ data }: Props) {
               <div>
                 <p className="text-sm text-muted-foreground">Total Scans</p>
                 <p className="text-2xl font-bold">{totalScans.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-info/10 rounded-lg flex items-center justify-center">
+                <span className="text-info text-xl font-bold">👥</span>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Unique Scans</p>
+                <p className="text-2xl font-bold">{uniqueScans.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -350,13 +401,16 @@ export default function IndividualQrAnalytics({ data }: Props) {
         <Card>
           <CardHeader>
             <h3 className="text-lg font-semibold">Hourly Distribution</h3>
+            {userTimezone && (
+              <p className="text-sm text-muted-foreground">Local time ({userTimezone})</p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-6 gap-2">
               {Array.from({ length: 24 }, (_, i) => {
-                const hourData = hourlyScans.find(h => h.hour === i);
+                const hourData = localHourlyScans.find(h => h.hour === i);
                 const scans = hourData?.scans || 0;
-                const maxScans = Math.max(...hourlyScans.map(h => h.scans));
+                const maxScans = Math.max(...localHourlyScans.map(h => h.scans));
                 const intensity = maxScans > 0 ? (scans / maxScans) : 0;
                 return (
                   <div key={i} className="text-center">

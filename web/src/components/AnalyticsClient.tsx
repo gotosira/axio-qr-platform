@@ -21,7 +21,16 @@ interface AnalyticsClientProps {
 }
 
 export default function AnalyticsClient({ data }: AnalyticsClientProps) {
-  const { qrs, qrAnalytics, totalScans, avgScansPerQr, topCountries, topCities, byReferer, recentScans } = data;
+  const { 
+    qrs = [], 
+    qrAnalytics = [], 
+    totalScans = 0, 
+    avgScansPerQr = 0, 
+    topCountries = [], 
+    topCities = [], 
+    byReferer = [], 
+    recentScans = [] 
+  } = data || {};
 
   const exportOverallReport = async () => {
     try {
@@ -47,6 +56,22 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
       toast.error("Failed to export analytics report");
     }
   };
+
+  // Show empty state if no QR codes
+  if (!qrs || qrs.length === 0) {
+    return (
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <div className="text-6xl mb-4">📊</div>
+        <h2 className="text-2xl font-bold mb-2">No Analytics Data</h2>
+        <p className="text-muted-foreground mb-6">
+          Create your first QR code to start tracking analytics.
+        </p>
+        <Link href="/">
+          <Button>Create QR Code</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -131,7 +156,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {qrAnalytics.slice(0, 5).map((qr: any, index: number) => {
+              {(qrAnalytics || []).slice(0, 5).map((qr: any, index: number) => {
                 const percentage = totalScans > 0 ? (qr.totalScans / totalScans) * 100 : 0;
                 return (
                   <div key={qr.id} className="space-y-2">
@@ -170,7 +195,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
               <div>
                 <h4 className="text-sm font-medium mb-3">Top Countries</h4>
                 <div className="space-y-3">
-                  {topCountries.map((country: any, index: number) => {
+                  {(topCountries || []).map((country: any, index: number) => {
                     const percentage = totalScans > 0 ? ((country._count?._all || 0) / totalScans) * 100 : 0;
                     return (
                       <div key={index} className="space-y-1">
@@ -193,7 +218,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
               <div>
                 <h4 className="text-sm font-medium mb-3">Top Cities</h4>
                 <div className="space-y-2">
-                  {topCities.slice(0, 3).map((city: any, index: number) => (
+                  {(topCities || []).slice(0, 3).map((city: any, index: number) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <span>{city.city || "Unknown"}</span>
                       <span className="text-muted-foreground">{city._count?._all || 0}</span>
@@ -216,7 +241,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-64 overflow-auto">
-              {recentScans.map((scan: any) => (
+              {(recentScans || []).map((scan: any) => (
                 <div key={scan.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{scan.qr.label}</p>
@@ -251,7 +276,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-64 overflow-auto">
-              {byReferer
+              {(byReferer || [])
                 .sort((a: any, b: any) => (b._count?._all || 0) - (a._count?._all || 0))
                 .slice(0, 8)
                 .map((referrer: any, index: number) => {
@@ -294,7 +319,7 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {qrAnalytics.map((qr: any) => (
+              {(qrAnalytics || []).map((qr: any) => (
                 <Link
                   key={qr.id}
                   href={`/analytics/${qr.id}`}
@@ -306,19 +331,13 @@ export default function AnalyticsClient({ data }: AnalyticsClientProps) {
                   </div>
                   <p className="text-xs text-muted-foreground mb-3 truncate">{qr.slug}</p>
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Recent Scans ({qr.scans.length}/10)</p>
-                    <div className="space-y-1 max-h-20 overflow-auto">
-                      {qr.scans.slice(0, 3).map((scan: any) => (
-                        <div key={scan.id} className="flex justify-between text-xs">
-                          <span className="truncate">{scan.ip || "Unknown"}</span>
-                          <span className="text-muted-foreground">
-                            {new Date(scan.createdAt).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </span>
-                        </div>
-                      ))}
+                    <p className="text-xs text-muted-foreground">Total Scans: {qr.totalScans || 0}</p>
+                    <div className="text-xs text-muted-foreground">
+                      <span>Created: {new Date(qr.createdAt).toLocaleDateString('en-US', { 
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}</span>
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-border/50">

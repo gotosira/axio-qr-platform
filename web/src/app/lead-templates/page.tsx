@@ -3,16 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
-import MyQrClient from "@/components/MyQrClient";
+import LeadTemplateClient from "@/components/LeadTemplateClient";
 
-export default async function MyQrPage() {
+export default async function LeadTemplatesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <div className="text-6xl mb-4">📱</div>
-        <h2 className="text-2xl font-bold mb-2">My QR Codes</h2>
-        <p className="text-muted-foreground mb-6">Please sign in to view your QR codes.</p>
+        <div className="text-6xl mb-4">🎨</div>
+        <h2 className="text-2xl font-bold mb-2">Lead Form Templates</h2>
+        <p className="text-muted-foreground mb-6">Please sign in to create and manage lead form templates.</p>
       </div>
     );
   }
@@ -33,26 +33,10 @@ export default async function MyQrPage() {
     );
   }
 
-  const qrs = await prisma.qRCode.findMany({
+  const templates = await prisma.leadTemplate.findMany({
     where: { ownerId: user.id },
-    select: {
-      id: true,
-      label: true,
-      slug: true,
-      destination: true,
-      logoUrl: true,
-      fgColor: true,
-      bgColor: true,
-      styleType: true,
-      logoAspect: true,
-      cornerRadius: true,
-      logoSizePct: true,
-      createdAt: true,
-      _count: { select: { scans: true } }
-    },
     orderBy: { createdAt: "desc" },
-    take: 100, // Limit for performance
   });
 
-  return <MyQrClient initialQrs={qrs} />;
+  return <LeadTemplateClient initialTemplates={templates} />;
 }

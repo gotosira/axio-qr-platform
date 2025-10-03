@@ -2,11 +2,17 @@
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { useEffect } from "react";
 
 export default function AuthModal() {
-  // Guard against missing provider during certain prerendered routes
-  const sessionApi = typeof useSession === "function" ? useSession() : undefined;
-  const session = sessionApi?.data as any;
+  const { data: session, status } = useSession();
+  
+  // Clear invalid sessions
+  useEffect(() => {
+    if (status === "authenticated" && !session?.user?.email) {
+      signOut({ callbackUrl: "/" });
+    }
+  }, [session, status]);
 
   if (session?.user) {
     return (

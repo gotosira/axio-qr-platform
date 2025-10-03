@@ -34,41 +34,48 @@ export default async function AnalyticsPage() {
     );
   }
 
-  // Optimize with parallel queries and count-only data
+  // Optimize with parallel queries and limit results for faster loading
   const [qrs, totals, byCountry, byCity, byReferer] = await Promise.all([
     prisma.qRCode.findMany({
       where: { ownerId: user.id },
-      include: { 
+      select: {
+        id: true,
+        label: true,
+        slug: true,
+        destination: true,
+        createdAt: true,
         _count: { select: { scans: true } }
       },
       orderBy: { createdAt: "desc" },
+      take: 50, // Limit for performance
     }),
     prisma.scanEvent.groupBy({ 
       by: ["qrId"], 
       where: { qr: { ownerId: user.id } },
-      _count: { _all: true } 
+      _count: { _all: true }
     }),
     prisma.scanEvent.groupBy({ 
       by: ["country"], 
       where: { qr: { ownerId: user.id } },
-      _count: { _all: true } 
+      _count: { _all: true }
     }),
     prisma.scanEvent.groupBy({ 
       by: ["city"], 
       where: { qr: { ownerId: user.id } },
-      _count: { _all: true } 
+      _count: { _all: true }
     }),
     prisma.scanEvent.groupBy({ 
       by: ["referer"], 
       where: { qr: { ownerId: user.id } },
-      _count: { _all: true } 
+      _count: { _all: true }
     })
   ]);
   
   // Get QR-specific analytics using the _count from the query
   const qrAnalytics = qrs.map(qr => ({
     ...qr,
-    totalScans: qr._count?.scans || 0
+    totalScans: qr._count?.scans || 0,
+    scans: [] // Provide empty array for compatibility
   })).sort((a, b) => b.totalScans - a.totalScans);
 
   const totalScans = totals.reduce((a, b) => a + (b._count?._all || 0), 0);
@@ -101,13 +108,17 @@ export default async function AnalyticsPage() {
   const topCities = byCity
     .sort((a, b) => (b._count?._all || 0) - (a._count?._all || 0))
     .slice(0, 5);
+    
+  // Sort other data client-side for performance
+  const sortedTotals = totals.sort((a, b) => (b._count?._all || 0) - (a._count?._all || 0));
+  const sortedReferrers = byReferer.sort((a, b) => (b._count?._all || 0) - (a._count?._all || 0));
 
   const analyticsData = {
     qrs,
-    totals,
+    totals: sortedTotals,
     byCountry,
     byCity,
-    byReferer,
+    byReferer: sortedReferrers,
     recentScans,
     qrAnalytics,
     totalScans,

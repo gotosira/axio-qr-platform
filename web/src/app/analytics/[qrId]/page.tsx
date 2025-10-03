@@ -65,6 +65,17 @@ export default async function IndividualAnalyticsPage({ params }: PageProps) {
     where: { qrId: qrId }
   });
 
+  // Get unique scans (count distinct IP addresses)
+  const uniqueScansResult = await prisma.scanEvent.groupBy({
+    by: ["ip"],
+    where: { 
+      qrId: qrId,
+      ip: { not: null }
+    },
+    _count: { _all: true }
+  });
+  const uniqueScans = uniqueScansResult.length;
+
   const scansByCountry = await prisma.scanEvent.groupBy({
     by: ["country"],
     where: { qrId: qrId },
@@ -125,6 +136,7 @@ export default async function IndividualAnalyticsPage({ params }: PageProps) {
   const analyticsData = {
     qr,
     totalScans,
+    uniqueScans,
     scansByCountry,
     scansByCity,
     scansByReferer,

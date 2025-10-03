@@ -6,23 +6,25 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 
 const styleSchema = z.object({
-  logoUrl: z.string().url().optional().nullable(),
+  logoUrl: z.string().optional().nullable(), // Allow data URLs and regular URLs
   fgColor: z.string().optional(),
   bgColor: z.string().optional(),
   styleType: z.enum(["square", "rounded", "dots"]).optional(),
   logoAspect: z.enum(["1:1", "16:9", "3:4"]).optional(),
   cornerRadius: z.number().int().min(0).max(100).optional(),
-  logoSizePct: z.number().int().min(10).max(60).optional(),
+  logoSizePct: z.number().int().min(5).max(70).optional(),
 }).partial();
 
 const createSchema = z.object({
   label: z.string().min(1),
   destination: z.string().min(1),
+  collectLeads: z.boolean().optional(),
+  leadTemplateId: z.string().optional().nullable(),
   style: styleSchema.optional(),
   metadata: z.object({
-    title: z.string().optional(),
-    description: z.string().optional(),
-    image: z.string().optional(),
+    title: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    image: z.string().optional().nullable(),
   }).optional(),
 });
 
@@ -55,12 +57,35 @@ export async function POST(req: Request) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Check content length to prevent 413 errors
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) { // 5MB limit
+      return NextResponse.json({ error: "Request too large. Please use a smaller logo image." }, { status: 413 });
+    }
+
     const json = await req.json().catch(() => null);
+    if (!json) {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
+
+    // Validate logo data URL size if present
+    if (json.style?.logoUrl && json.style.logoUrl.startsWith('data:')) {
+      const base64Size = json.style.logoUrl.length * 0.75; // Approximate decoded size
+      if (base64Size > 2 * 1024 * 1024) { // 2MB limit for base64 data
+        return NextResponse.json({ error: "Logo image too large. Please use an image smaller than 2MB." }, { status: 413 });
+      }
+    }
+
     const parsed = createSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      console.error("Validation failed:", parsed.error.issues);
+      console.error("Received payload:", JSON.stringify(json, null, 2));
+      return NextResponse.json({ 
+        error: "Invalid payload", 
+        details: parsed.error.issues 
+      }, { status: 400 });
     }
-    const { label, destination, style, metadata } = parsed.data;
+    const { label, destination, collectLeads, leadTemplateId, style, metadata } = parsed.data;
 
     let slug = randomBytes(4).toString("hex");
     for (let i = 0; i < 3; i++) {
@@ -75,6 +100,8 @@ export async function POST(req: Request) {
         destination,
         slug,
         ownerId: user.id,
+        collectLeads: collectLeads ?? false,
+        leadTemplateId: leadTemplateId || null,
         logoUrl: style?.logoUrl ?? null,
         fgColor: style?.fgColor ?? undefined,
         bgColor: style?.bgColor ?? undefined,

@@ -11,6 +11,7 @@ export type QR = {
   label: string;
   slug: string;
   destination: string;
+  collectLeads?: boolean;
   logoUrl?: string | null;
   fgColor?: string | null;
   bgColor?: string | null;
@@ -27,12 +28,18 @@ export default function QrGenerator() {
   // list moved to My QR page
   const [error, setError] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-  const [logoSize, setLogoSize] = useState<number>(24); // percentage of QR size
+  const [logoSize, setLogoSize] = useState<number>(35); // percentage of QR size
   const [logoAspect, setLogoAspect] = useState<"1:1" | "16:9" | "3:4">("1:1");
   const [fgColor, setFgColor] = useState<string>("#000000");
   const [bgColor, setBgColor] = useState<string>("#ffffff");
   const [styleType, setStyleType] = useState<"square" | "rounded" | "dots">("square");
   const [cornerRadius, setCornerRadius] = useState<number>(8);
+  const [qrSize, setQrSize] = useState<number>(256);
+  const [collectLeads, setCollectLeads] = useState<boolean>(false);
+  const [removeLogoBg, setRemoveLogoBg] = useState<boolean>(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [originalLogoFile, setOriginalLogoFile] = useState<File | null>(null);
 
   // management list removed here
 
@@ -60,6 +67,8 @@ export default function QrGenerator() {
         body: JSON.stringify({
           label: label.trim(),
           destination: destination.trim(),
+          collectLeads,
+          leadTemplateId: selectedTemplate || null,
           style: {
             logoUrl: logoDataUrl || undefined,
             fgColor,
@@ -86,8 +95,12 @@ export default function QrGenerator() {
       setLabel("");
       setDestination("");
       setLogoDataUrl(null);
+      setOriginalLogoFile(null);
       setUrlMetadata(null);
       setPreviewUrl(null);
+      setCollectLeads(false);
+      setRemoveLogoBg(false);
+      setSelectedTemplate("");
       
       toast.success("QR code created successfully! Check 'My QR Codes' to manage it.");
     } catch (e: any) {
@@ -109,34 +122,59 @@ export default function QrGenerator() {
   } | null>(null);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
 
+  // Load templates on component mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const response = await fetch("/api/lead-templates");
+      if (response.ok) {
+        const templatesData = await response.json();
+        setTemplates(templatesData);
+      }
+    } catch (error) {
+      console.error("Failed to load templates:", error);
+    }
+  };
+
   useEffect(() => {
     if (destination && destination.trim()) {
       generatePreview();
       
-      // Debounce metadata fetching
+      // Debounce metadata fetching - reduced delay for faster UX
       const timeoutId = setTimeout(() => {
         fetchUrlMetadata(destination);
-      }, 1000);
+      }, 500);
       
       return () => clearTimeout(timeoutId);
     } else {
       setPreviewUrl(null);
       setUrlMetadata(null);
     }
-  }, [destination, logoDataUrl, logoSize, logoAspect, fgColor, bgColor, styleType, cornerRadius]);
+  }, [destination, logoDataUrl, logoSize, logoAspect, fgColor, bgColor, styleType, cornerRadius, qrSize, removeLogoBg]);
+
+  // Reprocess logo when removeLogoBg setting changes
+  useEffect(() => {
+    if (originalLogoFile) {
+      reprocessCurrentLogo();
+    }
+  }, [removeLogoBg]);
 
   async function generatePreview() {
     try {
       const { default: QRCodeStyling } = await import("qr-code-styling");
       const qr = new QRCodeStyling({
-        width: 256,
-        height: 256,
+        width: qrSize,
+        height: qrSize,
         data: destination,
         image: logoDataUrl || undefined,
         imageOptions: {
           imageSize: logoDataUrl ? logoSize / 100 : 0,
-          margin: 4,
+          margin: removeLogoBg ? 0 : 4,
           crossOrigin: "anonymous",
+          hideBackgroundDots: removeLogoBg,
         },
         backgroundOptions: { color: bgColor },
         dotsOptions: {
@@ -153,7 +191,7 @@ export default function QrGenerator() {
       try {
         const png = await QRCode.toDataURL(destination, { 
           margin: 1, 
-          width: 256, 
+          width: qrSize, 
           color: { dark: fgColor, light: bgColor } 
         });
         setPreviewUrl(png);
@@ -222,11 +260,120 @@ export default function QrGenerator() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = () => setLogoDataUrl(reader.result as string);
-        reader.readAsDataURL(file);
+        processImageFile(file);
       }
     }
+  };
+
+  const processImageFile = async (file: File) => {
+    try {
+      // Check file size first
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        toast.error("Image is too large. Please use an image smaller than 5MB.");
+        return;
+      }
+
+      setOriginalLogoFile(file);
+      const compressedDataUrl = await compressImage(file);
+      setLogoDataUrl(compressedDataUrl);
+    } catch (error) {
+      console.error('Image processing failed:', error);
+      toast.error("Failed to process image. Please try a different image.");
+    }
+  };
+
+  // Reprocess logo when removeLogoBg changes
+  const reprocessCurrentLogo = async () => {
+    if (logoDataUrl && originalLogoFile) {
+      try {
+        const compressedDataUrl = await compressImage(originalLogoFile);
+        setLogoDataUrl(compressedDataUrl);
+      } catch (error) {
+        console.error('Logo reprocessing failed:', error);
+      }
+    }
+  };
+
+  const compressImage = (file: File, maxWidth = 512, maxHeight = 512, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Clear canvas with transparent background
+        if (ctx) {
+          ctx.clearRect(0, 0, width, height);
+          
+          // Draw image
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+        
+        // Determine output format based on input file type and removeLogoBg setting
+        const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+        const shouldPreserveTransparency = isPng || removeLogoBg;
+        
+        let compressedDataUrl: string;
+        
+        if (shouldPreserveTransparency) {
+          // Use PNG format to preserve transparency
+          compressedDataUrl = canvas.toDataURL('image/png');
+        } else {
+          // Use JPEG format for better compression
+          compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        // Check if compressed size is still reasonable
+        const compressedSize = compressedDataUrl.length * 0.75; // Approximate size
+        if (compressedSize > 1024 * 1024) { // 1MB limit
+          if (shouldPreserveTransparency) {
+            // For PNG, try to reduce size by using a smaller resolution
+            const smallerCanvas = document.createElement('canvas');
+            const smallerCtx = smallerCanvas.getContext('2d');
+            const smallerWidth = Math.floor(width * 0.7);
+            const smallerHeight = Math.floor(height * 0.7);
+            
+            smallerCanvas.width = smallerWidth;
+            smallerCanvas.height = smallerHeight;
+            
+            if (smallerCtx) {
+              smallerCtx.clearRect(0, 0, smallerWidth, smallerHeight);
+              smallerCtx.drawImage(img, 0, 0, smallerWidth, smallerHeight);
+              resolve(smallerCanvas.toDataURL('image/png'));
+            } else {
+              resolve(compressedDataUrl);
+            }
+          } else {
+            // Try with lower quality for JPEG
+            const lowerQualityDataUrl = canvas.toDataURL('image/jpeg', 0.5);
+            resolve(lowerQualityDataUrl);
+          }
+        } else {
+          resolve(compressedDataUrl);
+        }
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
   };
 
   return (
@@ -265,6 +412,57 @@ export default function QrGenerator() {
                   Enter a URL, phone number, text, or any content for your QR code
                 </p>
               </div>
+
+              {/* Lead Collection Option */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="collectLeads"
+                  checked={collectLeads}
+                  onChange={(e) => setCollectLeads(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
+                />
+                <label htmlFor="collectLeads" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Collect leads before redirecting
+                </label>
+              </div>
+              {collectLeads && (
+                <div className="ml-6 space-y-4">
+                  <div className="p-3 rounded-lg bg-muted/30 border border-muted">
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, users will see a lead collection form before being redirected to your destination URL.
+                      This helps you capture contact information from QR code scans.
+                    </p>
+                  </div>
+                  
+                  {/* Template Selection */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Lead Form Template</label>
+                    <select
+                      value={selectedTemplate}
+                      onChange={(e) => setSelectedTemplate(e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                    >
+                      <option value="">Default Template</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Choose a custom template or use the default form design.{" "}
+                      <a 
+                        href="/lead-templates" 
+                        target="_blank" 
+                        className="text-primary hover:underline"
+                      >
+                        Create templates →
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Logo Upload */}
@@ -291,9 +489,7 @@ export default function QrGenerator() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => setLogoDataUrl(reader.result as string);
-                    reader.readAsDataURL(file);
+                    processImageFile(file);
                   }}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
@@ -309,6 +505,7 @@ export default function QrGenerator() {
                           onClick={(e) => {
                             e.preventDefault();
                             setLogoDataUrl(null);
+                            setOriginalLogoFile(null);
                           }}
                           className="mt-2"
                         >
@@ -329,36 +526,80 @@ export default function QrGenerator() {
 
             {/* Logo Settings */}
             {logoDataUrl && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Logo Size: {logoSize}%</label>
-                  <input 
-                    type="range" 
-                    min={16} 
-                    max={36} 
-                    value={logoSize} 
-                    onChange={(e) => setLogoSize(parseInt(e.target.value))}
-                    aria-label={`Logo size: ${logoSize}%`}
-                    title={`Logo size: ${logoSize}%`}
-                    className="w-full"
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Logo Size: {logoSize}%</label>
+                    <input 
+                      type="range" 
+                      min={10} 
+                      max={60} 
+                      value={logoSize} 
+                      onChange={(e) => setLogoSize(parseInt(e.target.value))}
+                      aria-label={`Logo size: ${logoSize}%`}
+                      title={`Logo size: ${logoSize}%`}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Aspect Ratio</label>
+                    <select 
+                      value={logoAspect} 
+                      onChange={(e) => setLogoAspect(e.target.value as any)}
+                      aria-label="Logo aspect ratio"
+                      title="Logo aspect ratio"
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                    >
+                      <option value="1:1">Square (1:1)</option>
+                      <option value="16:9">Wide (16:9)</option>
+                      <option value="3:4">Tall (3:4)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Remove Logo Background Option */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="removeLogoBg"
+                    checked={removeLogoBg}
+                    onChange={(e) => setRemoveLogoBg(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
                   />
+                  <label htmlFor="removeLogoBg" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Remove logo background
+                  </label>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Aspect Ratio</label>
-                  <select 
-                    value={logoAspect} 
-                    onChange={(e) => setLogoAspect(e.target.value as any)}
-                    aria-label="Logo aspect ratio"
-                    title="Logo aspect ratio"
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                  >
-                    <option value="1:1">Square (1:1)</option>
-                    <option value="16:9">Wide (16:9)</option>
-                    <option value="3:4">Tall (3:4)</option>
-                  </select>
-                </div>
+                {removeLogoBg && (
+                  <div className="ml-6 p-3 rounded-lg bg-muted/30 border border-muted">
+                    <p className="text-xs text-muted-foreground">
+                      This will make the logo background transparent and remove the white background dots behind it for a cleaner look.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* QR Size Setting */}
+            <div>
+              <label className="block text-sm font-medium mb-2">QR Code Size: {qrSize}px</label>
+              <input 
+                type="range" 
+                min={128} 
+                max={2000} 
+                step={64}
+                value={qrSize} 
+                onChange={(e) => setQrSize(parseInt(e.target.value))}
+                aria-label={`QR code size: ${qrSize}px`}
+                title={`QR code size: ${qrSize}px`}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Small (128px)</span>
+                <span>Medium (1000px)</span>
+                <span>Highest (2000px)</span>
+              </div>
+            </div>
 
             {/* Style Settings */}
             <div className="grid grid-cols-2 gap-4">
@@ -463,7 +704,12 @@ export default function QrGenerator() {
                     <img 
                       src={previewUrl} 
                       alt="QR Code Preview" 
-                      className="w-64 h-64 mx-auto rounded-lg shadow-sm"
+                      className="mx-auto rounded-lg shadow-sm"
+                      style={{ 
+                        width: Math.min(qrSize, 320), 
+                        height: Math.min(qrSize, 320),
+                        maxWidth: '100%'
+                      }}
                     />
                     <div className="mt-4 space-y-2">
                       <p className="font-medium">{label || "QR Code"}</p>
@@ -471,7 +717,14 @@ export default function QrGenerator() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-64 h-64 mx-auto bg-muted/50 rounded-lg flex items-center justify-center">
+                  <div 
+                    className="mx-auto bg-muted/50 rounded-lg flex items-center justify-center"
+                    style={{ 
+                      width: Math.min(qrSize, 320), 
+                      height: Math.min(qrSize, 320),
+                      maxWidth: '100%'
+                    }}
+                  >
                     <div className="text-center text-muted-foreground">
                       <div className="text-4xl mb-2">📱</div>
                       <p className="text-sm">Enter content to see preview</p>

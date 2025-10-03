@@ -11,13 +11,15 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String         @id @default(cuid())
+  email        String         @unique
   name         String?
   passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   qrcodes      QRCode[]
+  leadTemplates LeadTemplate[]
+  templateAssets TemplateAsset[]
 }
 
 model QRCode {
@@ -30,6 +32,7 @@ model QRCode {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   scans       ScanEvent[]
+  leads       Lead[]
   // Metadata fields
   metaTitle       String?
   metaDescription String?
@@ -42,6 +45,10 @@ model QRCode {
   logoAspect    String?   @default("1:1")
   cornerRadius  Int?      @default(8)
   logoSizePct   Int?      @default(24)
+  // Lead collection
+  collectLeads  Boolean   @default(false)
+  leadTemplateId String?
+  leadTemplate   LeadTemplate? @relation(fields: [leadTemplateId], references: [id])
 }
 
 model ScanEvent {
@@ -54,4 +61,79 @@ model ScanEvent {
   referer    String?
   country    String?
   city       String?
+}
+
+model Lead {
+  id         String   @id @default(cuid())
+  qrId       String
+  qr         QRCode   @relation(fields: [qrId], references: [id])
+  createdAt  DateTime @default(now())
+  name       String?
+  email      String?
+  phone      String?
+  company    String?
+  message    String?
+  ip         String?
+  userAgent  String?
+}
+
+model LeadTemplate {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Template Design
+  title       String   @default("Get Exclusive Access")
+  subtitle    String?
+  logoUrl     String?
+  bannerUrl   String?
+  bannerPosition String @default("top") // "top", "bottom", "none"
+  
+  // Styling
+  backgroundColor String @default("#f8fafc")
+  cardColor      String @default("#ffffff")
+  primaryColor   String @default("#3b82f6")
+  textColor      String @default("#1f2937")
+  buttonColor    String @default("#3b82f6")
+  buttonTextColor String @default("#ffffff")
+  
+  // Button & Footer
+  buttonText     String @default("Submit")
+  footerText     String @default("Your information is secure and will not be shared with third parties.")
+  
+  // Social Media Links
+  facebookUrl    String?
+  twitterUrl     String?
+  instagramUrl   String?
+  linkedinUrl    String?
+  youtubeUrl     String?
+  tiktokUrl      String?
+  websiteUrl     String?
+  
+  // Legal Links
+  termsUrl       String?
+  privacyUrl     String?
+  
+  // Custom Form Fields (JSON)
+  formFields     Json   @default("[]")
+  
+  // QR Codes using this template
+  qrcodes        QRCode[]
+}
+
+model TemplateAsset {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  assetType   String   // "logo", "banner", "icon"
+  createdAt   DateTime @default(now())
 }

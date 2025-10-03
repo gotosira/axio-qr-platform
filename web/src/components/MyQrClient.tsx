@@ -4,8 +4,18 @@ import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import DeleteQrButton from "@/components/DeleteQrButton";
+import DownloadQrDropdown from "@/components/DownloadQrDropdown";
 import { toast } from "sonner";
 import QRCodeStyling from "qr-code-styling";
+import { X, Download } from "lucide-react";
+
+const BULK_DOWNLOAD_SIZES = [
+  { label: "Small (256px)", value: 256 },
+  { label: "Medium (512px)", value: 512 },
+  { label: "Large (1024px)", value: 1024 },
+  { label: "Extra Large (1536px)", value: 1536 },
+  { label: "Highest (2000px)", value: 2000 },
+];
 
 type QR = {
   id: string;
@@ -34,6 +44,9 @@ export default function MyQrClient({ initialQrs }: MyQrClientProps) {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "label" | "scans">("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showBulkExportModal, setShowBulkExportModal] = useState(false);
+  const [bulkExportProgress, setBulkExportProgress] = useState(0);
+  const [isBulkExporting, setIsBulkExporting] = useState(false);
 
   useEffect(() => {
     setShowBulkActions(selectedQrs.size > 0);
@@ -96,11 +109,135 @@ export default function MyQrClient({ initialQrs }: MyQrClientProps) {
   };
 
   const handleBulkExport = () => {
-    selectedQrs.forEach(id => {
-      const qr = qrs.find(q => q.id === id);
-      if (qr) {
-        window.open(`/api/scan/${qr.slug}`, '_blank');
+    setShowBulkExportModal(true);
+  };
+
+  const processBulkExport = async (targetSize: number) => {
+    setIsBulkExporting(true);
+    setBulkExportProgress(0);
+    
+    const selectedQrList = Array.from(selectedQrs).map(id => qrs.find(q => q.id === id)).filter(Boolean) as QR[];
+    const totalQrs = selectedQrList.length;
+    
+    try {
+      for (let i = 0; i < selectedQrList.length; i++) {
+        const qr = selectedQrList[i];
+        await generateAndDownloadQr(qr, targetSize);
+        setBulkExportProgress(((i + 1) / totalQrs) * 100);
+        
+        // Small delay to prevent overwhelming the browser
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
+      
+      toast.success(`Successfully exported ${totalQrs} QR code(s)`);
+      setShowBulkExportModal(false);
+      setSelectedQrs(new Set());
+    } catch (error) {
+      console.error("Bulk export failed:", error);
+      toast.error("Failed to export some QR codes");
+    } finally {
+      setIsBulkExporting(false);
+      setBulkExportProgress(0);
+    }
+  };
+
+  const generateAndDownloadQr = async (qr: QR, targetSize: number) => {
+    const url = `${window.location.origin}/api/scan/${qr.slug}`;
+    let dataUrl: string;
+
+    // Try advanced QR generation if we have custom styling
+    if (qr.logoUrl || qr.styleType !== "square" || (qr.cornerRadius && qr.cornerRadius > 0)) {
+      try {
+        dataUrl = await generateAdvancedQr(qr, url, targetSize);
+      } catch (advancedError) {
+        console.warn("Advanced QR generation failed, falling back to basic:", advancedError);
+        dataUrl = await generateBasicQr(url, targetSize);
+      }
+    } else {
+      dataUrl = await generateBasicQr(url, targetSize);
+    }
+
+    // Download the generated QR code
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `${qr.label || qr.slug}_${targetSize}px.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const generateAdvancedQr = async (qr: QR, url: string, targetSize: number): Promise<string> => {
+    const qrOptions: any = {
+      width: targetSize,
+      height: targetSize,
+      data: url,
+      margin: Math.max(4, Math.floor(targetSize * 0.02)),
+      qrOptions: {
+        typeNumber: 0,
+        mode: "Byte",
+        errorCorrectionLevel: "M"
+      },
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: (qr.logoSizePct || 20) / 100,
+        crossOrigin: "anonymous",
+        margin: 4,
+      },
+      backgroundOptions: {
+        color: qr.bgColor || "#ffffff",
+      },
+      dotsOptions: {
+        color: qr.fgColor || "#000000",
+        type: qr.styleType === "square" ? "square" : qr.styleType,
+      } as any,
+      cornersSquareOptions: {
+        type: "extra-rounded",
+        color: qr.fgColor || "#000000"
+      } as any,
+      cornersDotOptions: {
+        color: qr.fgColor || "#000000"
+      } as any,
+    };
+
+    if (qr.logoUrl) {
+      qrOptions.image = qr.logoUrl;
+    }
+
+    const qrCode = new QRCodeStyling(qrOptions);
+    const blob = await qrCode.getRawData("png") as Blob;
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const generateBasicQr = async (url: string, targetSize: number): Promise<string> => {
+    const qrCode = new QRCodeStyling({
+      width: targetSize,
+      height: targetSize,
+      data: url,
+      margin: Math.max(4, Math.floor(targetSize * 0.02)),
+      qrOptions: {
+        typeNumber: 0,
+        mode: "Byte",
+        errorCorrectionLevel: "M"
+      },
+      backgroundOptions: { color: "#ffffff" },
+      dotsOptions: { color: "#000000", type: "square" },
+      cornersSquareOptions: { type: "square", color: "#000000" },
+      cornersDotOptions: { color: "#000000" },
+    });
+
+    const blob = await qrCode.getRawData("png") as Blob;
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     });
   };
 
@@ -239,6 +376,73 @@ export default function MyQrClient({ initialQrs }: MyQrClientProps) {
               }}
             />
           ))}
+        </div>
+      )}
+
+      {/* Bulk Export Modal */}
+      {showBulkExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4 border shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Bulk Export QR Codes</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowBulkExportModal(false)}
+                disabled={isBulkExporting}
+              >
+                <X size={20} />
+              </Button>
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-4">
+              Export {selectedQrs.size} selected QR code(s) at your chosen size:
+            </p>
+            
+            {isBulkExporting ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin text-lg">⏳</div>
+                  <span className="text-sm">Exporting QR codes...</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${bulkExportProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {Math.round(bulkExportProgress)}% complete
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {BULK_DOWNLOAD_SIZES.map((size) => (
+                  <Button
+                    key={size.value}
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => processBulkExport(size.value)}
+                  >
+                    <span>{size.label}</span>
+                    <Download size={16} />
+                  </Button>
+                ))}
+              </div>
+            )}
+            
+            {!isBulkExporting && (
+              <div className="mt-4 pt-4 border-t">
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setShowBulkExportModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -418,16 +622,6 @@ function QrCodeCard({
     });
   };
 
-  const downloadQr = () => {
-    if (qrImageUrl) {
-      const a = document.createElement("a");
-      a.href = qrImageUrl;
-      a.download = `${qr.label || qr.slug}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
-  };
 
   if (viewMode === "list") {
     return (
@@ -460,9 +654,7 @@ function QrCodeCard({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={downloadQr}>
-                Download
-              </Button>
+              <DownloadQrDropdown qr={qr} size="sm" />
               <Button variant="outline" size="sm" asChild>
                 <a href={`/api/scan/${qr.slug}`} target="_blank">
                   Open
@@ -507,9 +699,7 @@ function QrCodeCard({
           <span>{qr._count?.scans || 0} scans</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={downloadQr} className="flex-1">
-            Download
-          </Button>
+          <DownloadQrDropdown qr={qr} size="sm" className="flex-1" />
           <Button variant="outline" size="sm" asChild>
             <a href={`/api/scan/${qr.slug}`} target="_blank">
               Open
