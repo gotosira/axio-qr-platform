@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
-import AnalyticsClient from "@/components/AnalyticsClient";
+import UnifiedAnalyticsClient from "@/components/UnifiedAnalyticsClient";
 
 export default async function AnalyticsPage() {
   const session = await getServerSession(authOptions);
@@ -127,7 +127,103 @@ export default async function AnalyticsPage() {
     topCities
   };
 
-  return <AnalyticsClient data={analyticsData} />;
+  // Get lead analytics data for unified view
+  const leadQrCodes = await prisma.qRCode.findMany({
+    where: { 
+      ownerId: user.id,
+      collectLeads: true
+    },
+    include: {
+      leadTemplate: true,
+      leads: {
+        orderBy: { createdAt: "desc" }
+      },
+      _count: {
+        select: { leads: true }
+      }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  const totalLeads = await prisma.lead.count({
+    where: {
+      qr: { ownerId: user.id }
+    }
+  });
+
+  const uniqueLeads = await prisma.lead.groupBy({
+    by: ["email"],
+    where: {
+      qr: { ownerId: user.id },
+      email: { not: null }
+    },
+    _count: { _all: true }
+  });
+
+  const recentLeads = await prisma.lead.findMany({
+    where: {
+      qr: { ownerId: user.id }
+    },
+    include: {
+      qr: {
+        select: {
+          label: true,
+          slug: true
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const dailyLeads = await prisma.$queryRaw`
+    SELECT 
+      DATE(l."createdAt") as date,
+      COUNT(*)::integer as leads
+    FROM "Lead" l
+    JOIN "QRCode" qr ON l."qrId" = qr.id
+    WHERE qr."ownerId" = ${user.id}
+      AND l."createdAt" >= ${thirtyDaysAgo}
+    GROUP BY DATE(l."createdAt")
+    ORDER BY date DESC
+  ` as { date: string; leads: number }[];
+
+  const hourlyLeads = await prisma.$queryRaw`
+    SELECT 
+      EXTRACT(HOUR FROM l."createdAt")::integer as hour,
+      COUNT(*)::integer as leads
+    FROM "Lead" l
+    JOIN "QRCode" qr ON l."qrId" = qr.id
+    WHERE qr."ownerId" = ${user.id}
+    GROUP BY EXTRACT(HOUR FROM l."createdAt")
+    ORDER BY hour
+  ` as { hour: number; leads: number }[];
+
+  const qrWithConversion = await Promise.all(leadQrCodes.map(async (qr) => {
+    const totalScans = await prisma.scanEvent.count({
+      where: { qrId: qr.id }
+    });
+    
+    return {
+      ...qr,
+      totalScans,
+      conversionRate: totalScans > 0 ? (qr._count.leads / totalScans) * 100 : 0
+    };
+  }));
+
+  const leadAnalyticsData = {
+    qrCodes: qrWithConversion,
+    totalLeads,
+    uniqueLeads: uniqueLeads.length,
+    recentLeads,
+    dailyLeads,
+    hourlyLeads
+  };
+
+  return <UnifiedAnalyticsClient qrData={analyticsData} leadData={leadAnalyticsData} />;
 }
 
 

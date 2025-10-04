@@ -75,6 +75,8 @@ model Lead {
   message    String?
   ip         String?
   userAgent  String?
+  // Custom form data as JSON for enhanced templates
+  formData   Json?    @default("{}")
 }
 
 model LeadTemplate {
