@@ -671,28 +671,28 @@ export default function LeadAnalyticsClient({ data }: Props) {
                     )}
                     {hasData.email && (
                       <td className="py-4 px-3 text-sm align-top">
-                        <a href={`mailto:${lead.email}`} className="text-primary hover:underline text-xs truncate block" title={lead.email}>
+                        <a href={`mailto:${lead.email}`} className="text-primary hover:underline text-xs truncate block" title={lead.email || undefined}>
                           {lead.email}
                         </a>
                       </td>
                     )}
                     {hasData.phone && (
                       <td className="py-4 px-3 text-sm align-top">
-                        <a href={`tel:${lead.phone}`} className="text-primary hover:underline text-xs truncate block" title={lead.phone}>
+                        <a href={`tel:${lead.phone}`} className="text-primary hover:underline text-xs truncate block" title={lead.phone || undefined}>
                           {lead.phone}
                         </a>
                       </td>
                     )}
                     {hasData.company && (
                       <td className="py-4 px-3 text-sm align-top">
-                        <span className="text-xs font-medium truncate" title={lead.company}>
+                        <span className="text-xs font-medium truncate" title={lead.company || undefined}>
                           {lead.company}
                         </span>
                       </td>
                     )}
                     {hasData.message && (
                       <td className="py-4 px-3 text-sm align-top">
-                        <div className="text-xs truncate" title={lead.message}>
+                        <div className="text-xs truncate" title={lead.message || undefined}>
                           {lead.message}
                         </div>
                       </td>
