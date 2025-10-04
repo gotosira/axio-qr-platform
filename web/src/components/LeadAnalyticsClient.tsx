@@ -91,42 +91,39 @@ export default function LeadAnalyticsClient({ data }: Props) {
     try {
       const leadsToExport = exportAll ? filteredLeads : paginatedLeads;
 
-      // Create headers including custom fields
-      const baseHeaders = ["Date", "Time", "QR Code", "QR Slug", "Name", "Email", "Phone", "Company", "Message"];
-      const customFields = new Set<string>();
-      
-      // Collect all custom field names
-      leadsToExport.forEach(lead => {
-        if (lead.formData && typeof lead.formData === 'object') {
-          Object.keys(lead.formData).forEach(key => customFields.add(key));
-        }
-      });
-      
-      const headers = [...baseHeaders, ...Array.from(customFields)];
+      // Create headers matching web display - only visible columns
+      const headers = ["Date", "Time", "QR Code", "QR Slug"];
+      if (hasData.name) headers.push("Name");
+      if (hasData.email) headers.push("Email");
+      if (hasData.phone) headers.push("Phone");
+      if (hasData.company) headers.push("Company");
+      if (hasData.message) headers.push("Message");
+      headers.push(...customFields);
       
       const csvContent = [
         headers.join(","),
         ...leadsToExport.map(lead => {
-          const baseData = [
+          const row = [
             formatDate(lead.createdAt),
             new Date(lead.createdAt).toLocaleTimeString(),
             lead.qr.label,
-            lead.qr.slug,
-            lead.name || "",
-            lead.email || "",
-            lead.phone || "",
-            lead.company || "",
-            lead.message || ""
+            lead.qr.slug
           ];
           
+          // Only add columns that are visible in web display
+          if (hasData.name) row.push(lead.name || "");
+          if (hasData.email) row.push(lead.email || "");
+          if (hasData.phone) row.push(lead.phone || "");
+          if (hasData.company) row.push(lead.company || "");
+          if (hasData.message) row.push(lead.message || "");
+          
           // Add custom field values
-          const customData = Array.from(customFields).map(field => {
+          customFields.forEach(field => {
             const value = lead.formData?.[field];
-            return value ? String(value) : "";
+            row.push(value ? String(value) : "");
           });
           
-          return [...baseData, ...customData]
-            .map(field => `"${(field || '').toString().replace(/"/g, '""')}"`)
+          return row.map(field => `"${(field || '').toString().replace(/"/g, '""')}"`)
             .join(",");
         })
       ].join("\\n");
@@ -159,73 +156,259 @@ export default function LeadAnalyticsClient({ data }: Props) {
         return;
       }
 
-      const customFields = new Set<string>();
-      leadsToExport.forEach(lead => {
-        if (lead.formData && typeof lead.formData === 'object') {
-          Object.keys(lead.formData).forEach(key => customFields.add(key));
-        }
-      });
-
       const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Leads Export - ${new Date().toLocaleDateString()}</title>
+          <title>AXIO QR - Leads Export</title>
+          <meta charset="UTF-8">
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; text-align: center; margin-bottom: 30px; }
-            .info { text-align: center; margin-bottom: 20px; color: #666; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
-            .empty { text-align: center; font-style: italic; color: #999; }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+              margin: 0; 
+              padding: 30px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+            }
+            .container {
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+              overflow: hidden;
+              max-width: 1200px;
+              margin: 0 auto;
+            }
+            .header {
+              background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+              color: white;
+              padding: 40px 30px;
+              text-align: center;
+            }
+            .header h1 {
+              margin: 0 0 15px 0;
+              font-size: 32px;
+              font-weight: 600;
+              letter-spacing: -0.5px;
+            }
+            .header .subtitle {
+              font-size: 18px;
+              opacity: 0.9;
+              margin: 0;
+            }
+            .info-section {
+              background: #f8fafc;
+              padding: 25px 30px;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .info-item {
+              background: white;
+              padding: 15px 20px;
+              border-radius: 8px;
+              border-left: 4px solid #2563eb;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            .info-label {
+              font-size: 12px;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-bottom: 5px;
+              font-weight: 600;
+            }
+            .info-value {
+              font-size: 16px;
+              color: #1e293b;
+              font-weight: 600;
+            }
+            .table-container {
+              padding: 30px;
+              overflow-x: auto;
+            }
+            .table-title {
+              font-size: 24px;
+              color: #1e293b;
+              margin-bottom: 20px;
+              font-weight: 600;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+            .table-title::before {
+              content: '📊';
+              font-size: 28px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              background: white;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            }
+            th {
+              background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+              color: white;
+              padding: 16px 12px;
+              text-align: left;
+              font-size: 13px;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              border: none;
+            }
+            td {
+              padding: 14px 12px;
+              border-bottom: 1px solid #e2e8f0;
+              font-size: 13px;
+              color: #374151;
+              vertical-align: top;
+            }
+            tr:nth-child(even) td {
+              background-color: #f8fafc;
+            }
+            tr:hover td {
+              background-color: #f1f5f9;
+            }
+            .empty {
+              color: #9ca3af;
+              font-style: italic;
+              font-size: 12px;
+            }
+            .email-link {
+              color: #2563eb;
+              text-decoration: none;
+            }
+            .phone-link {
+              color: #059669;
+              text-decoration: none;
+            }
+            .footer {
+              background: #1e293b;
+              color: white;
+              padding: 20px 30px;
+              text-align: center;
+              font-size: 14px;
+            }
+            .footer .timestamp {
+              opacity: 0.8;
+              margin-top: 5px;
+            }
             @media print {
-              body { margin: 0; }
+              body { 
+                background: white !important;
+                padding: 0 !important;
+              }
+              .container {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+              }
+              .header {
+                background: #2563eb !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+              }
+              th {
+                background: #1e293b !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+              }
+              tr:nth-child(even) td {
+                background-color: #f8fafc !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+              }
               table { page-break-inside: auto; }
               tr { page-break-inside: avoid; page-break-after: auto; }
             }
           </style>
         </head>
         <body>
-          <h1>AXIO QR - Leads Export</h1>
-          <div class="info">
-            <p>Export Date: ${new Date().toLocaleString()}</p>
-            <p>Total Records: ${leadsToExport.length}</p>
-            <p>Filter: ${selectedQrId === 'all' ? 'All QR Codes' : qrCodes.find(qr => qr.id === selectedQrId)?.label || 'Unknown'}</p>
+          <div class="container">
+            <div class="header">
+              <h1>Lead Collection Report</h1>
+              <p class="subtitle">Comprehensive Lead Analytics Export</p>
+            </div>
+            
+            <div class="info-section">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Export Date</div>
+                  <div class="info-value">${new Date().toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Total Records</div>
+                  <div class="info-value">${leadsToExport.length.toLocaleString()} leads</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">QR Filter</div>
+                  <div class="info-value">${selectedQrId === 'all' ? 'All QR Codes' : qrCodes.find(qr => qr.id === selectedQrId)?.label || 'Unknown'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Export Time</div>
+                  <div class="info-value">${new Date().toLocaleTimeString()}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="table-container">
+              <div class="table-title">Lead Details</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>QR Code</th>
+                    ${hasData.name ? '<th>Name</th>' : ''}
+                    ${hasData.email ? '<th>Email</th>' : ''}
+                    ${hasData.phone ? '<th>Phone</th>' : ''}
+                    ${hasData.company ? '<th>Company</th>' : ''}
+                    ${hasData.message ? '<th>Message</th>' : ''}
+                    ${customFields.map(field => `<th>${field}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${leadsToExport.map((lead, index) => `
+                    <tr>
+                      <td>
+                        <div style="font-weight: 600; color: #1e293b;">${formatDate(lead.createdAt)}</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${new Date(lead.createdAt).toLocaleTimeString()}</div>
+                      </td>
+                      <td>
+                        <div style="font-weight: 600; color: #1e293b;">${lead.qr.label}</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">/${lead.qr.slug}</div>
+                      </td>
+                      ${hasData.name ? `<td style="font-weight: 500;">${lead.name || '<span class="empty">Not provided</span>'}</td>` : ''}
+                      ${hasData.email ? `<td>${lead.email ? `<a href="mailto:${lead.email}" class="email-link">${lead.email}</a>` : '<span class="empty">Not provided</span>'}</td>` : ''}
+                      ${hasData.phone ? `<td>${lead.phone ? `<a href="tel:${lead.phone}" class="phone-link">${lead.phone}</a>` : '<span class="empty">Not provided</span>'}</td>` : ''}
+                      ${hasData.company ? `<td style="font-weight: 500;">${lead.company || '<span class="empty">Not provided</span>'}</td>` : ''}
+                      ${hasData.message ? `<td style="max-width: 250px; word-wrap: break-word;">${lead.message || '<span class="empty">No message</span>'}</td>` : ''}
+                      ${customFields.map(field => {
+                        const value = lead.formData?.[field];
+                        return `<td style="font-weight: 500;">${value || '<span class="empty">-</span>'}</td>`;
+                      }).join('')}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="footer">
+              <div>Generated by AXIO QR Platform</div>
+              <div class="timestamp">Report generated on ${new Date().toLocaleString()}</div>
+            </div>
           </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>QR Code</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Company</th>
-                <th>Message</th>
-                ${Array.from(customFields).map(field => `<th>${field}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${leadsToExport.map(lead => `
-                <tr>
-                  <td>${formatDateTime(lead.createdAt)}</td>
-                  <td>${lead.qr.label}</td>
-                  <td>${lead.name || '<span class="empty">Not provided</span>'}</td>
-                  <td>${lead.email || '<span class="empty">Not provided</span>'}</td>
-                  <td>${lead.phone || '<span class="empty">Not provided</span>'}</td>
-                  <td>${lead.company || '<span class="empty">Not provided</span>'}</td>
-                  <td>${lead.message || '<span class="empty">No message</span>'}</td>
-                  ${Array.from(customFields).map(field => {
-                    const value = lead.formData?.[field];
-                    return `<td>${value || '<span class="empty">-</span>'}</td>`;
-                  }).join('')}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
         </body>
         </html>
       `;
