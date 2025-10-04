@@ -664,7 +664,7 @@ export default function LeadAnalyticsClient({ data }: Props) {
                     </td>
                     {hasData.name && (
                       <td className="py-4 px-3 text-sm align-top">
-                        <span className="text-xs font-medium" title={lead.name}>
+                        <span className="text-xs font-medium" title={lead.name || undefined}>
                           {lead.name}
                         </span>
                       </td>
