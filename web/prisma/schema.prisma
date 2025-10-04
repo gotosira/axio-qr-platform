@@ -58,6 +58,9 @@ model QRCode {
   // Folder organization
   folderId      String?
   folder        Folder?   @relation(fields: [folderId], references: [id])
+  // Campaign organization
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id])
   // A/B Testing
   isTestVariant Boolean   @default(false)
   parentQrId    String?
