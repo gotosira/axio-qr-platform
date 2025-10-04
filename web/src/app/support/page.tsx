@@ -255,8 +255,8 @@ export default function SupportPage() {
                 <div>
                   <p className="font-medium">Email Support</p>
                   <p className="text-sm text-muted-foreground">
-                    <a href="mailto:support@axioqr.com" className="text-primary hover:underline">
-                      support@axioqr.com
+                    <a href="mailto:sira.han@axonstech.com" className="text-primary hover:underline">
+                      sira.han@axonstech.com
                     </a>
                   </p>
                 </div>

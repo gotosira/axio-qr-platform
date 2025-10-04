@@ -1,10 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AuthModal from "@/components/AuthModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Button } from "@/components/ui/Button";
 
 export default function ConditionalLayout({
   children,
@@ -12,7 +15,17 @@ export default function ConditionalLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
   const isLeadPage = pathname?.startsWith("/lead/");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    console.log("ConditionalLayout - Session status:", status, "Session data:", session);
+  }, [session, status]);
 
   if (isLeadPage) {
     return (
@@ -72,7 +85,25 @@ export default function ConditionalLayout({
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <AuthModal />
+              {!mounted || status === "loading" ? (
+                <div className="w-20 h-9 bg-muted animate-pulse rounded-md" />
+              ) : session?.user ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    {session.user.name || session.user.email}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="h-9"
+                  >
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <AuthModal />
+              )}
             </div>
           </div>
         </div>
@@ -89,7 +120,7 @@ export default function ConditionalLayout({
               <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-xs">Q</span>
               </div>
-              <span className="text-sm text-muted-foreground">© 2024 AXIO QR. All rights reserved.</span>
+              <span className="text-sm text-muted-foreground">© 2025 AXIO QR. All rights reserved.</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>

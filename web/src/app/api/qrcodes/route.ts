@@ -20,6 +20,7 @@ const createSchema = z.object({
   destination: z.string().min(1),
   collectLeads: z.boolean().optional(),
   leadTemplateId: z.string().optional().nullable(),
+  folderId: z.string().optional().nullable(),
   style: styleSchema.optional(),
   metadata: z.object({
     title: z.string().optional().nullable(),
@@ -39,8 +40,8 @@ export async function GET() {
   const list = await prisma.qRCode.findMany({
     where: { ownerId: user.id },
     include: {
-      scans: {
-        select: { id: true },
+      _count: {
+        select: { scans: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -85,13 +86,27 @@ export async function POST(req: Request) {
         details: parsed.error.issues 
       }, { status: 400 });
     }
-    const { label, destination, collectLeads, leadTemplateId, style, metadata } = parsed.data;
+    const { label, destination, collectLeads, leadTemplateId, folderId, style, metadata } = parsed.data;
 
     let slug = randomBytes(4).toString("hex");
     for (let i = 0; i < 3; i++) {
       const existing = await prisma.qRCode.findUnique({ where: { slug } });
       if (!existing) break;
       slug = randomBytes(4).toString("hex");
+    }
+
+    // Validate folder ownership if folderId is provided
+    if (folderId) {
+      const folder = await prisma.folder.findFirst({
+        where: { 
+          id: folderId,
+          ownerId: user.id 
+        }
+      });
+
+      if (!folder) {
+        return NextResponse.json({ error: "Folder not found" }, { status: 404 });
+      }
     }
 
     const created = await prisma.qRCode.create({
@@ -102,6 +117,7 @@ export async function POST(req: Request) {
         ownerId: user.id,
         collectLeads: collectLeads ?? false,
         leadTemplateId: leadTemplateId || null,
+        folderId: folderId || null,
         logoUrl: style?.logoUrl ?? null,
         fgColor: style?.fgColor ?? undefined,
         bgColor: style?.bgColor ?? undefined,

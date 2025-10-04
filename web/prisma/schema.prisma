@@ -20,6 +20,9 @@ model User {
   qrcodes      QRCode[]
   leadTemplates LeadTemplate[]
   templateAssets TemplateAsset[]
+  folders      Folder[]
+  campaigns    Campaign[]
+  scheduledReports ScheduledReport[]
 }
 
 model QRCode {
@@ -33,6 +36,9 @@ model QRCode {
   updatedAt   DateTime    @updatedAt
   scans       ScanEvent[]
   leads       Lead[]
+  // QR Content Type and Data
+  contentType   String     @default("url") // "url", "vcard", "wifi", "event", "sms", "email", "whatsapp", "phone", "text"
+  contentData   Json       @default("{}")  // Structured data for each content type
   // Metadata fields
   metaTitle       String?
   metaDescription String?
@@ -49,6 +55,14 @@ model QRCode {
   collectLeads  Boolean   @default(false)
   leadTemplateId String?
   leadTemplate   LeadTemplate? @relation(fields: [leadTemplateId], references: [id])
+  // Folder organization
+  folderId      String?
+  folder        Folder?   @relation(fields: [folderId], references: [id])
+  // A/B Testing
+  isTestVariant Boolean   @default(false)
+  parentQrId    String?
+  parentQr      QRCode?   @relation("QRVariants", fields: [parentQrId], references: [id])
+  variants      QRCode[]  @relation("QRVariants")
 }
 
 model ScanEvent {
@@ -61,6 +75,16 @@ model ScanEvent {
   referer    String?
   country    String?
   city       String?
+  // Enhanced analytics
+  deviceType String?  // "mobile", "tablet", "desktop"
+  browser    String?  // "chrome", "safari", "firefox", etc.
+  os         String?  // "ios", "android", "windows", etc.
+  latitude   Float?
+  longitude  Float?
+  // Conversion tracking
+  sessionId  String?  // Track user sessions
+  converted  Boolean  @default(false) // Did user complete desired action
+  conversionValue Float? // Value of conversion (optional)
 }
 
 model Lead {
@@ -138,4 +162,52 @@ model TemplateAsset {
   url         String
   assetType   String   // "logo", "banner", "icon"
   createdAt   DateTime @default(now())
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  name        String
+  description String?
+  icon        String   @default("📁") // Emoji icon
+  color       String   @default("#3b82f6") // Hex color
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  qrcodes     QRCode[]
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  qrcodes     QRCode[]
+}
+
+model ScheduledReport {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  name        String
+  frequency   String   // "daily", "weekly", "monthly"
+  emailTo     String[]
+  reportType  String   // "analytics", "leads", "combined"
+  filters     Json     @default("{}")
+  lastSent    DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

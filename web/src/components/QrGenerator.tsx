@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import FolderSelector from "@/components/FolderSelector";
 import { toast } from "sonner";
 
 export type QR = {
@@ -40,6 +41,7 @@ export default function QrGenerator() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [templates, setTemplates] = useState<any[]>([]);
   const [originalLogoFile, setOriginalLogoFile] = useState<File | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   // management list removed here
 
@@ -59,6 +61,12 @@ export default function QrGenerator() {
       return;
     }
 
+    if (!selectedFolderId) {
+      setError("Please select a folder for your QR code");
+      toast.error("Please select a folder for your QR code");
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch("/api/qrcodes", {
@@ -69,6 +77,7 @@ export default function QrGenerator() {
           destination: destination.trim(),
           collectLeads,
           leadTemplateId: selectedTemplate || null,
+          folderId: selectedFolderId,
           style: {
             logoUrl: logoDataUrl || undefined,
             fgColor,
@@ -101,6 +110,7 @@ export default function QrGenerator() {
       setCollectLeads(false);
       setRemoveLogoBg(false);
       setSelectedTemplate("");
+      setSelectedFolderId(null);
       
       toast.success("QR code created successfully! Check 'My QR Codes' to manage it.");
     } catch (e: any) {
@@ -413,6 +423,20 @@ export default function QrGenerator() {
                 </p>
               </div>
 
+              {/* Folder Selection */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Folder</label>
+                <FolderSelector
+                  value={selectedFolderId}
+                  onChange={setSelectedFolderId}
+                  required={true}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select a folder to organize your QR code. You can create a new folder if needed.
+                </p>
+              </div>
+
               {/* Lead Collection Option */}
               <div className="flex items-center space-x-2">
                 <input
@@ -679,7 +703,7 @@ export default function QrGenerator() {
 
             <Button 
               onClick={create} 
-              disabled={creating || !label.trim() || !destination.trim()}
+              disabled={creating || !label.trim() || !destination.trim() || !selectedFolderId}
               size="lg"
               className="w-full"
             >

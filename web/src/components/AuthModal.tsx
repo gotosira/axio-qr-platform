@@ -2,10 +2,15 @@
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function AuthModal() {
   const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Clear invalid sessions
   useEffect(() => {
@@ -13,6 +18,17 @@ export default function AuthModal() {
       signOut({ callbackUrl: "/" });
     }
   }, [session, status]);
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="sm">
+          Loading...
+        </Button>
+      </div>
+    );
+  }
 
   if (session?.user) {
     return (

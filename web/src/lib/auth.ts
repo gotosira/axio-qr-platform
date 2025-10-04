@@ -10,6 +10,7 @@ export const credentialsSchema = z.object({
 });
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   providers: [
     Credentials({
@@ -33,6 +34,26 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/auth/signin",
     newUser: "/auth/signup",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user = {
+          id: token.id as string,
+          email: token.email as string,
+          name: token.name as string,
+        };
+      }
+      return session;
+    },
   },
 };
 

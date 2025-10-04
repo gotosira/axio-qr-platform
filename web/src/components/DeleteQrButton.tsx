@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { Trash2 } from "lucide-react";
 
 export default function DeleteQrButton({ 
   id, 
@@ -18,6 +19,7 @@ export default function DeleteQrButton({
     <Button
       variant="destructive"
       size="sm"
+      className="flex-shrink-0 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
       disabled={pending || loading}
       onClick={() => {
         if (!confirm("Delete this QR code?")) return;
@@ -35,7 +37,11 @@ export default function DeleteQrButton({
           .finally(() => setLoading(false));
       }}
     >
-      {loading ? "..." : "🗑"}
+      {loading ? (
+        <div className="animate-spin w-4 h-4 border border-white border-t-transparent rounded-full"></div>
+      ) : (
+        <Trash2 size={16} className="text-white" />
+      )}
     </Button>
   );
 }

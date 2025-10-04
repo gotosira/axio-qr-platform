@@ -183,20 +183,20 @@ export default function DownloadQrDropdown({ qr, className = "", size = "sm" }: 
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      <div className="flex">
+      <div className="flex items-center">
         <Button
           variant="outline"
           size={size}
           onClick={() => generateAndDownloadQr(512)} // Default download size
           disabled={isGenerating}
-          className="rounded-r-none border-r-0 flex-1"
+          className="rounded-r-none border-r-0 flex-1 min-w-0"
         >
           {isGenerating ? (
             <div className="animate-spin text-sm">⏳</div>
           ) : (
             <>
-              <Download size={16} className="mr-1" />
-              Download
+              <Download size={16} className="mr-1 flex-shrink-0" />
+              <span className="truncate">Download</span>
             </>
           )}
         </Button>
@@ -205,7 +205,7 @@ export default function DownloadQrDropdown({ qr, className = "", size = "sm" }: 
           size={size}
           onClick={() => setIsOpen(!isOpen)}
           disabled={isGenerating}
-          className="rounded-l-none px-2"
+          className="rounded-l-none px-2 flex-shrink-0"
         >
           <ChevronDown size={16} />
         </Button>

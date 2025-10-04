@@ -88,29 +88,66 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Dark mode theme - Custom Blue-Gray Palette */
+.dark {
+  --background: #2c3044;     /* Darkest blue-gray for main background */
+  --foreground: #ffffff;     /* White text for high contrast */
+  --muted: #3a455f;          /* Medium blue-gray for subtle backgrounds */
+  --muted-foreground: #b0b8cc; /* Light blue-gray for muted text */
+  --border: #4a6087;         /* Medium-light blue-gray for borders */
+  --input: #3a455f;          /* Medium blue-gray for input backgrounds */
+  --card: #2c3044;           /* Same as background for cards */
+  --card-foreground: #ffffff; /* White text on cards */
+  --primary: #5e7ea9;        /* Main brand color - brightest blue-gray */
+  --primary-foreground: #ffffff; /* White text on primary */
+  --secondary: #576e95;      /* Secondary color - second brightest */
+  --secondary-foreground: #ffffff; /* White text on secondary */
+  --accent: #4a6087;         /* Accent color - medium blue-gray */
+  --accent-foreground: #ffffff; /* White text on accent */
+  --destructive: #dc2626;    /* Keep red for destructive actions */
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;        /* Keep green for success */
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;        /* Keep orange for warnings */
+  --warning-foreground: #2c3044; /* Dark text on warning */
+  --ring: #5e7ea9;           /* Primary color for focus rings */
+  
+  /* Dark mode specific shadows with blue-gray tints */
+  --shadow-sm: 0 1px 2px 0 rgba(44, 48, 68, 0.8);
+  --shadow-md: 0 4px 6px -1px rgba(44, 48, 68, 0.8), 0 2px 4px -2px rgba(44, 48, 68, 0.8);
+  --shadow-lg: 0 10px 15px -3px rgba(44, 48, 68, 0.9), 0 4px 6px -4px rgba(44, 48, 68, 0.9);
+  --shadow-xl: 0 20px 25px -5px rgba(44, 48, 68, 0.9), 0 8px 10px -6px rgba(44, 48, 68, 0.9);
+}
+
+/* System dark mode fallback */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-    --muted: #262626;
-    --muted-foreground: #a3a3a3;
-    --border: #404040;
-    --input: #262626;
-    --card: #171717;
-    --card-foreground: #fafafa;
-    --primary: #3b82f6;
+  :root:not(.light) {
+    --background: #2c3044;
+    --foreground: #ffffff;
+    --muted: #3a455f;
+    --muted-foreground: #b0b8cc;
+    --border: #4a6087;
+    --input: #3a455f;
+    --card: #2c3044;
+    --card-foreground: #ffffff;
+    --primary: #5e7ea9;
     --primary-foreground: #ffffff;
-    --secondary: #262626;
-    --secondary-foreground: #fafafa;
-    --accent: #262626;
-    --accent-foreground: #fafafa;
-    --destructive: #ef4444;
+    --secondary: #576e95;
+    --secondary-foreground: #ffffff;
+    --accent: #4a6087;
+    --accent-foreground: #ffffff;
+    --destructive: #dc2626;
     --destructive-foreground: #ffffff;
-    --success: #22c55e;
+    --success: #16a34a;
     --success-foreground: #ffffff;
     --warning: #f59e0b;
-    --warning-foreground: #000000;
-    --ring: #3b82f6;
+    --warning-foreground: #2c3044;
+    --ring: #5e7ea9;
+    
+    --shadow-sm: 0 1px 2px 0 rgba(44, 48, 68, 0.8);
+    --shadow-md: 0 4px 6px -1px rgba(44, 48, 68, 0.8), 0 2px 4px -2px rgba(44, 48, 68, 0.8);
+    --shadow-lg: 0 10px 15px -3px rgba(44, 48, 68, 0.9), 0 4px 6px -4px rgba(44, 48, 68, 0.9);
+    --shadow-xl: 0 20px 25px -5px rgba(44, 48, 68, 0.9), 0 8px 10px -6px rgba(44, 48, 68, 0.9);
   }
 }
 
@@ -162,6 +199,13 @@ html {
   50% { opacity: 0.5; }
 }
 
+/* Container overrides for full width */
+.container {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+}
+
 /* Utility classes */
 .animate-fade-in {
   animation: fadeIn var(--transition-normal) ease-out;
@@ -180,4 +224,258 @@ html {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Dark mode specific enhancements */
+.dark {
+  color-scheme: dark;
+}
+
+.dark img {
+  opacity: 0.9;
+}
+
+.dark .bg-white {
+  background-color: var(--card) !important;
+}
+
+.dark .text-black {
+  color: var(--foreground) !important;
+}
+
+.dark .border-gray-200 {
+  border-color: var(--border) !important;
+}
+
+.dark .border-gray-300 {
+  border-color: var(--border) !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: var(--muted) !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: var(--muted) !important;
+}
+
+.dark .text-gray-600 {
+  color: var(--muted-foreground) !important;
+}
+
+.dark .text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+.dark .text-gray-800 {
+  color: var(--foreground) !important;
+}
+
+.dark .text-gray-900 {
+  color: var(--foreground) !important;
+}
+
+/* Enhanced form styling in dark mode */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--input);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+/* Enhanced button variants for dark mode */
+.dark .btn-secondary {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  border-color: var(--border);
+}
+
+.dark .btn-outline {
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.dark .btn-outline:hover {
+  background-color: var(--muted);
+}
+
+/* Dark scrollbars */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Enhanced backdrop for dark mode */
+.dark .backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* Dark mode specific transitions */
+.dark * {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Enhanced dark mode for specific elements */
+.dark .bg-blue-50\/50 {
+  background-color: rgba(30, 58, 138, 0.1) !important;
+}
+
+.dark .border-blue-300 {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Dark mode code blocks and pre elements */
+.dark pre,
+.dark code {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+/* Dark mode tables */
+.dark table {
+  background-color: var(--card);
+  border-color: var(--border);
+}
+
+.dark th,
+.dark td {
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.dark th {
+  background-color: var(--muted);
+}
+
+.dark tr:nth-child(even) {
+  background-color: var(--muted);
+}
+
+/* Dark mode for QR code related elements */
+.dark .qr-preview {
+  background-color: var(--card);
+  border-color: var(--border);
+}
+
+/* Enhanced hover states for dark mode */
+.dark .hover\:bg-muted\/50:hover {
+  background-color: rgba(58, 69, 95, 0.5);
+}
+
+.dark .hover\:bg-accent:hover {
+  background-color: var(--accent);
+}
+
+/* Dark mode dropdown and select elements */
+.dark select,
+.dark option {
+  background-color: var(--input);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+/* Dark mode progress bars */
+.dark .bg-primary {
+  background-color: var(--primary);
+}
+
+.dark .bg-muted {
+  background-color: var(--muted);
+}
+
+/* Dark mode for toast notifications */
+.dark [data-sonner-toaster] {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+.dark [data-sonner-toast] {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+/* Dark mode selection highlighting */
+.dark ::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Enhanced glass effect for dark mode */
+.dark .bg-background\/95 {
+  background-color: rgba(44, 48, 68, 0.95) !important;
+}
+
+.dark .bg-background\/60 {
+  background-color: rgba(44, 48, 68, 0.85) !important;
+}
+
+/* Dark mode footer */
+.dark .bg-muted\/50 {
+  background-color: rgba(58, 69, 95, 0.8) !important;
+}
+
+/* Dark mode animation enhancements */
+.dark .animate-slide-up {
+  filter: brightness(1.1);
+}
+
+/* Dark mode specific hover effects */
+.dark .group:hover .group-hover\:shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+}
+
+/* Enhanced colors for better visibility in dark mode */
+.dark {
+  --primary: #5e7ea9;        /* Consistent with our blue-gray theme */
+  --primary-foreground: #ffffff;
+  --success: #22c55e;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #2c3044;  /* Use our dark background color */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+}
+
+/* Make sure text is always visible in dark mode */
+.dark .text-primary {
+  color: #5e7ea9 !important;  /* Use our primary blue-gray */
+}
+
+.dark .text-success {
+  color: #4ade80 !important;
+}
+
+.dark .text-warning {
+  color: #fbbf24 !important;
+}
+
+.dark .text-destructive {
+  color: #f87171 !important;
 }

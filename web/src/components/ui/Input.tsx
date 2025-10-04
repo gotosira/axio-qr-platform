@@ -8,7 +8,9 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type = "text", left, right, ...props }, ref) => {
+  ({ className, type = "text", left, right, value, ...props }, ref) => {
+    // Convert null values to empty string to prevent React warnings
+    const safeValue = value === null ? "" : value;
     if (left || right) {
       return (
         <div className={twMerge(
@@ -20,6 +22,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             type={type}
             className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
             ref={ref}
+            value={safeValue}
             {...props}
           />
           {right}
@@ -35,6 +38,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
+        value={safeValue}
         {...props}
       />
     );
